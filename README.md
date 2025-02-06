@@ -1,9 +1,28 @@
-# Fabric Example Mod
+# FPS XYZ Mod
 
-## Setup
+마인크래프트에서 FPS, 좌표, 시간 등 다양한 정보를 화면에 표시해주는 모드입니다.
 
-For setup instructions please see the [fabric documentation page](https://docs.fabricmc.net/develop/getting-started/setting-up-a-development-environment) that relates to the IDE that you are using.
+![img.png](img.png)
 
-## License
+## 주요 기능
 
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+### 화면 표시 정보
+- FPS (Frames Per Second)
+- 현재 좌표 (X, Y, Z)
+- 현재 바이옴(Biome)
+- 게임 내 시간
+- 실제 시간
+
+### 커스터마이징
+- 각 정보의 표시 여부 설정
+- 텍스트 크기 조절
+- 표시 위치 설정 (좌측 상단/우측 상단)
+
+## 성능 최적화
+- 정보별 최적화된 업데이트 주기 적용
+    - 날씨: 5초
+    - 실제 시간: 1초
+    - FPS: 250ms
+    - 바이옴: 16블록 이동시
+    - 게임 시간: 50ms
+- 텍스트 캐싱으로 렌더링 성능 향상
