@@ -1,14 +1,15 @@
 package com.dd3ok.fpsxyzs;
 
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.client.MinecraftClient;
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.Identifier;
 
 public class FPSXYZsMod implements ClientModInitializer {
     private static ModConfig config;
     private static InfoDisplay infoDisplay;
-    private final MinecraftClient client = MinecraftClient.getInstance();
+    private final Minecraft client = Minecraft.getInstance();
 
     @Override
     public void onInitializeClient() {
@@ -16,18 +17,16 @@ public class FPSXYZsMod implements ClientModInitializer {
         infoDisplay = new InfoDisplay(client, config);
         ModKeybinds.register();
 
-        // HUD 콜백에서 config 체크를 가장 먼저 수행
-        HudRenderCallback.EVENT.register((context, tickDelta) -> {
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("fpsxyzs", "info_display"), (graphics, tickDelta) -> {
             if (!config.isEnabled()) return; // early return으로 모든 처리 스킵
             infoDisplay.update();
-            infoDisplay.render(context);
+            infoDisplay.render(graphics);
         });
 
         // 키 입력 이벤트는 유지 (모드 활성화/비활성화 용도)
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (ModKeybinds.toggleHud.wasPressed()) {
+            if (ModKeybinds.toggleHud.consumeClick()) {
                 config.setEnabled(!config.isEnabled());
-                config.save();
             }
         });
     }

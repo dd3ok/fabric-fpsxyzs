@@ -1,19 +1,23 @@
 package com.dd3ok.fpsxyzs;
 
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 
 public class ModKeybinds {
-    public static KeyBinding toggleHud;
+    private static final KeyMapping.Category CATEGORY = KeyMapping.Category.register(
+            Identifier.fromNamespaceAndPath("fpsxyzs", "general")
+    );
+
+    public static KeyMapping toggleHud;
 
     public static void register() {
-        toggleHud = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+        toggleHud = KeyMappingHelper.registerKeyMapping(new KeyMapping(
             "key.fpsxyzs.toggle", // 키 식별자
-            InputUtil.Type.KEYSYM, // 키보드 입력 타입
-            GLFW.GLFW_KEY_LEFT_BRACKET, // 기본 키 ( [ 키 )
-            "category.fpsxyzs.general" // 설정 메뉴에서의 카테고리
+            InputConstants.Type.KEYSYM, // 키보드 입력 타입
+            InputConstants.KEY_LBRACKET, // 기본 키 ( [ 키 )
+            CATEGORY // 설정 메뉴에서의 카테고리
         ));
     }
 }
