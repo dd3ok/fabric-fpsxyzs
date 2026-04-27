@@ -1,182 +1,176 @@
 package com.dd3ok.fpsxyzs.gui;
 
 import com.dd3ok.fpsxyzs.ModConfig;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.gui.widget.TextWidget;
-import net.minecraft.text.Text;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Consumer;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 public class ModMainMenuScreen extends Screen {
+    private static final int CONTROL_WIDTH = 170;
+    private static final int CONTROL_HEIGHT = 20;
+    private static final int ROW_HEIGHT = 24;
+    private static final int SECTION_GAP = 12;
+    private static final int COLUMN_GAP = 32;
+
     private final Screen parent;
     private final ModConfig config;
-    private final List<TextFieldWidget> textFields = new ArrayList<>();
 
-    private static final int BUTTON_WIDTH = 150;
-    private static final int BUTTON_HEIGHT = 20;
-    private static final int SPACING = 24;
-    private static final int SECTION_SPACING = 15;
+    private boolean showFps;
+    private boolean showCoords;
+    private boolean showBiome;
+    private boolean showGameTime;
+    private boolean showRealTime;
+    private boolean showCoordinateFacingAxis;
+    private ModConfig.Position position;
+    private String coordinateSeparator;
+    private float textScale;
+    private int lineSpacing;
+
+    private EditBox coordinateSeparatorField;
+    private EditBox textScaleField;
+    private EditBox lineSpacingField;
 
     public ModMainMenuScreen(Screen parent, ModConfig config) {
-        super(Text.literal("FPS XYZ Settings"));
+        super(Component.literal("FPS XYZ Settings"));
         this.parent = parent;
         this.config = config;
+        loadDraft();
+    }
+
+    private void loadDraft() {
+        showFps = config.isShowFps();
+        showCoords = config.isShowCoords();
+        showBiome = config.isShowBiome();
+        showGameTime = config.isShowGameTime();
+        showRealTime = config.isShowRealTime();
+        showCoordinateFacingAxis = config.isShowCoordinateFacingAxis();
+        position = config.getPosition();
+        coordinateSeparator = config.getCoordinateSeparator();
+        textScale = config.getTextScale();
+        lineSpacing = config.getLineSpacing();
     }
 
     @Override
     protected void init() {
-        int leftColumnX = width / 3;
-        int rightColumnX = (width * 2) / 3;
-        int startY = 40;
+        int totalWidth = CONTROL_WIDTH * 2 + COLUMN_GAP;
+        int leftX = Math.max(8, (width - totalWidth) / 2);
+        int rightX = leftX + CONTROL_WIDTH + COLUMN_GAP;
+        int startY = 38;
 
         int leftY = startY;
-        addDisplayTogglesSection(leftColumnX, leftY);
+        leftY = addSectionTitle(leftX, leftY, "Display");
+        leftY = addToggle(leftX, leftY, "FPS", showFps, value -> showFps = value);
+        leftY = addToggle(leftX, leftY, "XYZ", showCoords, value -> showCoords = value);
+        leftY = addToggle(leftX, leftY, "Biome", showBiome, value -> showBiome = value);
+        leftY = addToggle(leftX, leftY, "Game Time", showGameTime, value -> showGameTime = value);
+        leftY = addToggle(leftX, leftY, "Real Time", showRealTime, value -> showRealTime = value);
 
         int rightY = startY;
-        addGeneralSettingsSection(rightColumnX, rightY);
+        rightY = addSectionTitle(rightX, rightY, "XYZ");
+        rightY = addToggle(rightX, rightY, "Facing Axis", showCoordinateFacingAxis,
+                value -> showCoordinateFacingAxis = value);
+        coordinateSeparatorField = addTextField(rightX, rightY, "Separator", coordinateSeparator);
+        rightY += ROW_HEIGHT + SECTION_GAP;
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Done"), button -> {
-                    config.save();
-                    client.setScreen(parent);
+        rightY = addSectionTitle(rightX, rightY, "General");
+        addRenderableWidget(CycleButton.<ModConfig.Position>builder(
+                        pos -> Component.literal("Position: " + pos.getDisplayName()),
+                        position)
+                .withValues(ModConfig.Position.values())
+                .create(rightX, rightY, CONTROL_WIDTH, CONTROL_HEIGHT, Component.literal("Position"),
+                        (button, value) -> position = value));
+        rightY += ROW_HEIGHT + SECTION_GAP;
+
+        textScaleField = addTextField(rightX, rightY, "Text Scale", Float.toString(textScale));
+        rightY += ROW_HEIGHT + SECTION_GAP;
+        lineSpacingField = addTextField(rightX, rightY, "Line Spacing", Integer.toString(lineSpacing));
+
+        int preferredButtonY = Math.max(leftY, rightY) + SECTION_GAP;
+        int lowestVisibleButtonY = height - CONTROL_HEIGHT - 8;
+        int buttonY = Math.min(preferredButtonY, lowestVisibleButtonY);
+        int cancelX = width / 2 - CONTROL_WIDTH - 5;
+        int doneX = width / 2 + 5;
+
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> minecraft.setScreen(parent))
+                .bounds(cancelX, buttonY, CONTROL_WIDTH, CONTROL_HEIGHT)
+                .build());
+        addRenderableWidget(Button.builder(Component.literal("Done"), button -> {
+                    applyDraft();
+                    minecraft.setScreen(parent);
                 })
-                .dimensions(width/2 - BUTTON_WIDTH/2, height - 30, BUTTON_WIDTH, BUTTON_HEIGHT)
+                .bounds(doneX, buttonY, CONTROL_WIDTH, CONTROL_HEIGHT)
                 .build());
     }
 
-    private int addDisplayTogglesSection(int centerX, int startY) {
-        int currentY = startY;
-
-        drawSectionTitle("Display Options", centerX, currentY);
-        currentY += 25;
-
-        addToggleButton("Show FPS", config.isShowFps(), config::setShowFps, centerX, currentY);
-        currentY += SPACING;
-        addToggleButton("Show XYZ", config.isShowCoords(), config::setShowCoords, centerX, currentY);
-        currentY += SPACING;
-        addToggleButton("Show Biome", config.isShowBiome(), config::setShowBiome, centerX, currentY);
-        currentY += SPACING;
-        addToggleButton("Show Game Time", config.isShowGameTime(), config::setShowGameTime, centerX, currentY);
-        currentY += SPACING;
-        addToggleButton("Show Real Time", config.isShowRealTime(), config::setShowRealTime, centerX, currentY);
-        currentY += SPACING;
-
-        return currentY;
+    private int addSectionTitle(int x, int y, String label) {
+        Component title = Component.literal(label);
+        addRenderableOnly((graphics, mouseX, mouseY, delta) ->
+                graphics.text(font, title, x, y, 0xFFFFFF, false));
+        return y + ROW_HEIGHT;
     }
 
-    private int addGeneralSettingsSection(int centerX, int startY) {
-        int currentY = startY;
-
-        drawSectionTitle("General Settings", centerX, currentY);
-        currentY += 25;
-
-        addDrawableChild(CyclingButtonWidget.<ModConfig.Position>builder(pos ->
-                        Text.literal("Position: " + pos.getDisplayName()))
-                .values(ModConfig.Position.values())
-                .initially(config.getPosition())
-                .build(
-                        centerX - BUTTON_WIDTH/2,
-                        currentY,
-                        BUTTON_WIDTH,
-                        BUTTON_HEIGHT,
-                        Text.literal("Position"),
-                        (button, position) -> config.setPosition(position)
-                ));
-        currentY += SPACING;
-
-        addNumberField("Text Scale", String.valueOf(config.getTextScale()),
-                value -> config.setTextScale(parseFloat(value, 0.5f, 2.0f)), centerX, currentY);
-        currentY += SPACING * 3;
-
-        addNumberField("Line Spacing", String.valueOf(config.getLineSpacing()),
-                value -> config.setLineSpacing(parseInt(value, 5, 20)), centerX, currentY);
-        currentY += SPACING * 3;
-
-        return currentY;
+    private int addToggle(int x, int y, String label, boolean initialValue, ToggleSetter setter) {
+        addRenderableWidget(CycleButton.onOffBuilder(initialValue)
+                .create(x, y, CONTROL_WIDTH, CONTROL_HEIGHT, Component.literal(label),
+                        (button, value) -> setter.set(value)));
+        return y + ROW_HEIGHT;
     }
 
-    private void drawSectionTitle(String title, int centerX, int y) {
-        addDrawableChild(new TextWidget(centerX - BUTTON_WIDTH/2, y, BUTTON_WIDTH, 15,
-                Text.literal(title), textRenderer));
+    private EditBox addTextField(int x, int y, String label, String initialValue) {
+        Component title = Component.literal(label);
+        addRenderableOnly((graphics, mouseX, mouseY, delta) ->
+                graphics.text(font, title, x, y - 11, 0xA0A0A0, false));
+
+        EditBox field = new EditBox(font, x, y, CONTROL_WIDTH, CONTROL_HEIGHT, title);
+        field.setValue(initialValue);
+        addRenderableWidget(field);
+        return field;
     }
 
-    private void addToggleButton(String label, boolean initialState, Consumer<Boolean> setter, int centerX, int y) {
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(initialState)
-                .build(
-                        centerX - BUTTON_WIDTH/2,
-                        y,
-                        BUTTON_WIDTH,
-                        BUTTON_HEIGHT,
-                        Text.literal(label),
-                        (button, state) -> setter.accept(state)
-                ));
-    }
-
-    private void addNumberField(String label, String initialValue, Consumer<String> setter, int centerX, int y) {
-        addDrawableChild(ButtonWidget.builder(Text.literal(label), button -> {})
-                .dimensions(centerX - BUTTON_WIDTH/2, y - 15, BUTTON_WIDTH, 15)
-                .build());
-
-        TextFieldWidget field = new TextFieldWidget(
-                textRenderer,
-                centerX - BUTTON_WIDTH/2,
-                y,
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                Text.literal(label)
+    private void applyDraft() {
+        config.applySettings(
+                showFps,
+                showCoords,
+                showBiome,
+                showGameTime,
+                showRealTime,
+                showCoordinateFacingAxis,
+                position,
+                coordinateSeparatorField.getValue(),
+                parseFloat(textScaleField.getValue(), 0.5f, 2.0f, textScale),
+                parseInt(lineSpacingField.getValue(), 5, 20, lineSpacing)
         );
-        field.setText(initialValue);
-        field.setTextPredicate(text -> text.matches("^\\d*\\.?\\d*$"));
-        field.setChangedListener(setter);
-        textFields.add(field);
-        addDrawableChild(field);
     }
 
-    private void addTextField(String label, String initialValue, Consumer<String> setter, int centerX, int y) {
-        addDrawableChild(ButtonWidget.builder(Text.literal(label), button -> {})
-                .dimensions(centerX - BUTTON_WIDTH/2, y - 15, BUTTON_WIDTH, 15)
-                .build());
-
-        TextFieldWidget field = new TextFieldWidget(
-                textRenderer,
-                centerX - BUTTON_WIDTH/2,
-                y,
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                Text.literal(label)
-        );
-        field.setText(initialValue);
-        field.setChangedListener(setter);
-        textFields.add(field);
-        addDrawableChild(field);
-    }
-
-    private float parseFloat(String value, float min, float max) {
+    private float parseFloat(String value, float min, float max, float fallback) {
         try {
             float parsed = Float.parseFloat(value);
             return Math.max(min, Math.min(max, parsed));
         } catch (NumberFormatException e) {
-            return min;
+            return fallback;
         }
     }
 
-    private int parseInt(String value, int min, int max) {
+    private int parseInt(String value, int min, int max, int fallback) {
         try {
             int parsed = Integer.parseInt(value);
             return Math.max(min, Math.min(max, parsed));
         } catch (NumberFormatException e) {
-            return min;
+            return fallback;
         }
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
-        context.drawCenteredTextWithShadow(textRenderer, title, width / 2, 10, 0xFFFFFF);
-        super.render(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
+        graphics.centeredText(font, title, width / 2, 14, 0xFFFFFF);
+    }
+
+    @FunctionalInterface
+    private interface ToggleSetter {
+        void set(boolean value);
     }
 }
