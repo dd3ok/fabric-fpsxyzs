@@ -1,16 +1,16 @@
 {
 	"schemaVersion": 1,
 	"id": "fpsxyzs",
-	"version": "1.0.0",
+	"version": "${version}",
 	"name": "FPS, XYZ, Etc Display",
-	"description": "Display FPS, coordinates, weather, biome and time information",
+	"description": "Display FPS, coordinates, biome and time information",
 	"authors": ["dd3ok"],
 	"contact": {
 		"sources": "https://github.com/dd3ok/fabric-fpsxyzs"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/fpsxyzs/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
 		"client": [
 			"com.dd3ok.fpsxyzs.FPSXYZsMod"

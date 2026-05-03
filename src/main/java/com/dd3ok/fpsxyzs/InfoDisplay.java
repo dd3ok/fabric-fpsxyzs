@@ -14,7 +14,7 @@ public class InfoDisplay {
     private static final int BIOME_UPDATE_DISTANCE = 16;
     private static final int GAME_TIME_UPDATE_INTERVAL = 50;
     private static final int REAL_TIME_UPDATE_INTERVAL = 1000;
-    private static final int FPS_UPDATE_INTERVAL = 250;
+    private static final int FPS_UPDATE_INTERVAL = 1000;
 
     private final Minecraft client;
     private final ModConfig config;
@@ -39,7 +39,7 @@ public class InfoDisplay {
     private int lastCoordZ = Integer.MIN_VALUE;
     private int lastCoordFacingQuarter = Integer.MIN_VALUE;
     private boolean lastShowCoordinateFacingAxis;
-    private String lastCoordinateSeparator = "";
+    private boolean lastCoordinateCommaSeparator;
     private String cachedCoords = "";
 
     public InfoDisplay(Minecraft client, ModConfig config) {
@@ -50,6 +50,30 @@ public class InfoDisplay {
         this.cachedTextObjects = new Component[MAX_LINES];
         this.cachedTextWidths = new int[MAX_LINES];
         this.lineBuilder = new StringBuilder(100);
+    }
+
+    public void reset() {
+        lastUpdateTime = 0;
+        lastRealTimeUpdate = 0;
+        cachedRealTime = "";
+        lastBiomePos = null;
+        cachedBiomeName = "";
+        lastGameTimeUpdate = 0;
+        cachedGameTime = "";
+        needsRendering = false;
+        lastFpsUpdate = 0;
+        cachedFps = "";
+        lastCoordX = Integer.MIN_VALUE;
+        lastCoordY = Integer.MIN_VALUE;
+        lastCoordZ = Integer.MIN_VALUE;
+        lastCoordFacingQuarter = Integer.MIN_VALUE;
+        lastShowCoordinateFacingAxis = false;
+        lastCoordinateCommaSeparator = false;
+        cachedCoords = "";
+        clearLines();
+        Arrays.fill(cachedLines, null);
+        Arrays.fill(cachedTextObjects, null);
+        Arrays.fill(cachedTextWidths, 0);
     }
 
     public void update() {
@@ -71,6 +95,7 @@ public class InfoDisplay {
         if (config.isShowBiome()) updateBiome();
         if (config.isShowGameTime()) updateGameTime(currentTime);
         if (config.isShowRealTime()) updateRealTime(currentTime);
+
     }
 
     private void clearLines() {
@@ -94,21 +119,21 @@ public class InfoDisplay {
         int facingQuarter = showFacingAxis
                 ? CoordinateFormatter.facingQuarter(client.player.getYRot())
                 : Integer.MIN_VALUE;
-        String coordinateSeparator = config.getCoordinateSeparator();
+        boolean coordinateCommaSeparator = config.isCoordinateCommaSeparator();
 
         if (x != lastCoordX
                 || y != lastCoordY
                 || z != lastCoordZ
                 || showFacingAxis != lastShowCoordinateFacingAxis
                 || facingQuarter != lastCoordFacingQuarter
-                || !coordinateSeparator.equals(lastCoordinateSeparator)) {
-            cachedCoords = CoordinateFormatter.format(x, y, z, coordinateSeparator, showFacingAxis, client.player.getYRot());
+                || coordinateCommaSeparator != lastCoordinateCommaSeparator) {
+            cachedCoords = CoordinateFormatter.format(x, y, z, coordinateCommaSeparator, showFacingAxis, client.player.getYRot());
             lastCoordX = x;
             lastCoordY = y;
             lastCoordZ = z;
             lastShowCoordinateFacingAxis = showFacingAxis;
             lastCoordFacingQuarter = facingQuarter;
-            lastCoordinateSeparator = coordinateSeparator;
+            lastCoordinateCommaSeparator = coordinateCommaSeparator;
         }
 
         appendToLine(config.getCoordsLine(), cachedCoords);
@@ -192,9 +217,7 @@ public class InfoDisplay {
             if (line != null && !line.isEmpty()) {
                 updateCachedText(i, line);
 
-                int x = (position == ModConfig.Position.TOP_RIGHT)
-                        ? screenWidth - cachedTextWidths[i] - 5
-                        : 5;
+                int x = computeTextX(position, screenWidth, cachedTextWidths[i]);
 
                 graphics.text(
                         client.font,
@@ -202,7 +225,7 @@ public class InfoDisplay {
                         x,
                         y,
                         textColor,
-                        false
+                        true
                 );
 
                 y += lineSpacing;
@@ -224,5 +247,17 @@ public class InfoDisplay {
         return Math.abs(first.getX() - second.getX())
                 + Math.abs(first.getY() - second.getY())
                 + Math.abs(first.getZ() - second.getZ());
+    }
+
+    static int fpsUpdateIntervalMillis() {
+        return FPS_UPDATE_INTERVAL;
+    }
+
+    static int computeTextX(ModConfig.Position position, int screenWidth, int textWidth) {
+        return switch (position) {
+            case TOP_CENTER -> (screenWidth - textWidth) / 2;
+            case TOP_RIGHT -> screenWidth - textWidth - 5;
+            default -> 5;
+        };
     }
 }

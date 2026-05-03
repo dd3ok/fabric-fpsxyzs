@@ -10,27 +10,23 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 public class ModConfig {
-    private static final Path CONFIG_PATH = FabricLoader.getInstance()
-            .getConfigDir()
-            .resolve("fpsxyzs.json");
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
+    private transient Path configPath;
     private boolean enabled = true;
     private boolean showFps = true;
     private boolean showCoords = true;
-//    private boolean showWeather = true;
     private boolean showBiome = true;
     private boolean showGameTime = true;
     private boolean showRealTime = true;
     private boolean showCoordinateFacingAxis = false;
     private Position position = Position.TOP_RIGHT;
-    private float textScale = 0.8f;
-    private int textColor = 0xFFFFFF;
-    private int lineSpacing = 9;
+    private float textScale = 1.0f;
+    private int textColor = 0xFFFFFFFF;
+    private int lineSpacing = 10;
 
     private int fpsLine = 1;
     private int coordsLine = 2;
-//    private int weatherLine = 4;
     private int gameTimeLine = 3;
     private int realTimeLine = 3;
     private int biomeLine = 4;
@@ -101,9 +97,19 @@ public class ModConfig {
     // 같은 줄에 있는 정보들 사이의 구분자
     private String separator = " | ";
     private String coordinateSeparator = " ";
+    private boolean coordinateCommaSeparator = false;
+
+    public ModConfig() {
+        this(defaultConfigPath());
+    }
+
+    ModConfig(Path configPath) {
+        this.configPath = configPath;
+    }
 
     public enum Position {
         TOP_LEFT("Top Left"),
+        TOP_CENTER("Top Center"),
         TOP_RIGHT("Top Right");
 
         private final String displayName;
@@ -118,16 +124,27 @@ public class ModConfig {
     }
 
     public static ModConfig load() {
-        if (Files.exists(CONFIG_PATH)) {
+        Path configPath = defaultConfigPath();
+        if (Files.exists(configPath)) {
             try {
-                String json = Files.readString(CONFIG_PATH);
+                String json = Files.readString(configPath);
                 ModConfig config = GSON.fromJson(json, ModConfig.class);
-                return config == null ? new ModConfig() : config;
+                if (config == null) {
+                    return new ModConfig(configPath);
+                }
+                config.configPath = configPath;
+                return config;
             } catch (IOException e) {
                 System.err.println("Failed to load config: " + e.getMessage());
             }
         }
-        return new ModConfig();
+        return new ModConfig(configPath);
+    }
+
+    private static Path defaultConfigPath() {
+        return FabricLoader.getInstance()
+                .getConfigDir()
+                .resolve("fpsxyzs.json");
     }
 
     public void save() {
@@ -141,8 +158,11 @@ public class ModConfig {
 
     private void writeToDisk() {
         try {
+            if (configPath.getParent() != null) {
+                Files.createDirectories(configPath.getParent());
+            }
             String json = GSON.toJson(this);
-            Files.writeString(CONFIG_PATH, json,
+            Files.writeString(configPath, json,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
             System.err.println("Failed to save config: " + e.getMessage());
@@ -150,6 +170,7 @@ public class ModConfig {
     }
 
     public void applySettings(
+            boolean enabled,
             boolean showFps,
             boolean showCoords,
             boolean showBiome,
@@ -157,13 +178,14 @@ public class ModConfig {
             boolean showRealTime,
             boolean showCoordinateFacingAxis,
             Position position,
-            String coordinateSeparator,
+            boolean coordinateCommaSeparator,
             float textScale,
             int lineSpacing
     ) {
         deferSave = true;
         dirty = false;
 
+        setEnabled(enabled);
         setShowFps(showFps);
         setShowCoords(showCoords);
         setShowBiome(showBiome);
@@ -171,7 +193,7 @@ public class ModConfig {
         setShowRealTime(showRealTime);
         setShowCoordinateFacingAxis(showCoordinateFacingAxis);
         setPosition(position);
-        setCoordinateSeparator(coordinateSeparator);
+        setCoordinateCommaSeparator(coordinateCommaSeparator);
         setTextScale(textScale);
         setLineSpacing(lineSpacing);
 
@@ -180,6 +202,22 @@ public class ModConfig {
             dirty = false;
             writeToDisk();
         }
+    }
+
+    public void resetDisplayDefaults() {
+        applySettings(
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                Position.TOP_LEFT,
+                false,
+                1.0f,
+                10
+        );
     }
 
     public boolean isEnabled() { return enabled; }
@@ -231,14 +269,14 @@ public class ModConfig {
         save();
     }
 
-    public String getCoordinateSeparator() {
-        return coordinateSeparator == null || coordinateSeparator.isEmpty() ? " " : coordinateSeparator;
+    public boolean isCoordinateCommaSeparator() {
+        return coordinateCommaSeparator || ", ".equals(coordinateSeparator);
     }
 
-    public void setCoordinateSeparator(String coordinateSeparator) {
-        String newCoordinateSeparator = coordinateSeparator == null ? " " : coordinateSeparator;
-        if (newCoordinateSeparator.equals(this.coordinateSeparator)) return;
-        this.coordinateSeparator = newCoordinateSeparator;
+    public void setCoordinateCommaSeparator(boolean coordinateCommaSeparator) {
+        if (this.coordinateCommaSeparator == coordinateCommaSeparator && ", ".equals(coordinateSeparator) == coordinateCommaSeparator) return;
+        this.coordinateCommaSeparator = coordinateCommaSeparator;
+        this.coordinateSeparator = coordinateCommaSeparator ? ", " : " ";
         save();
     }
 
@@ -249,26 +287,37 @@ public class ModConfig {
         save();
     }
 
-    public float getTextScale() { return textScale; }
+    public float getTextScale() {
+        return textScale < 1.0f ? 1.0f : textScale;
+    }
     public void setTextScale(float scale) {
-        float newTextScale = Math.max(0.5f, Math.min(2.0f, scale));
+        float newTextScale = Math.max(1.0f, Math.min(2.0f, scale));
         if (Float.compare(this.textScale, newTextScale) == 0) return;
         this.textScale = newTextScale;
         save();
     }
 
-    public int getTextColor() { return textColor; }
+    public int getTextColor() {
+        return withOpaqueAlpha(textColor);
+    }
     public void setTextColor(int color) {
-        if (this.textColor == color) return;
-        this.textColor = color;
+        int newColor = withOpaqueAlpha(color);
+        if (this.textColor == newColor) return;
+        this.textColor = newColor;
         save();
     }
 
-    public int getLineSpacing() { return lineSpacing; }
+    public int getLineSpacing() {
+        return lineSpacing < 10 ? 10 : lineSpacing;
+    }
     public void setLineSpacing(int spacing) {
-        int newLineSpacing = Math.max(5, Math.min(20, spacing));
+        int newLineSpacing = Math.max(10, Math.min(20, spacing));
         if (this.lineSpacing == newLineSpacing) return;
         this.lineSpacing = newLineSpacing;
         save();
+    }
+
+    private static int withOpaqueAlpha(int color) {
+        return (color & 0xFF000000) == 0 ? color | 0xFF000000 : color;
     }
 }
